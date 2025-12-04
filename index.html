@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TUVN - Monitoreo Térmico (Sala/Cocina/Patio/Garaje)</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+
+  <!-- Fuente -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Roboto', sans-serif; }
+    .sensor-card { transition: transform .18s ease, box-shadow .18s ease; }
+    .sensor-card:hover { transform: translateY(-6px); box-shadow: 0 12px 30px rgba(2,6,23,0.12); }
+    .spark-canvas { width:100% !important; height:50px !important; }
+    .badge-low { background: #60a5fa; color: white; }       /* azul */
+    .badge-medium { background: #f59e0b; color: white; }    /* amarillo */
+    .badge-high { background: #ef4444; color: white; }      /* rojo */
+    .badge-normal { background: #10b981; color: white; }    /* verde */
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col">
+
+  <!-- HEADER -->
+  <header class="bg-blue-900 text-white shadow-lg border-b-4 border-red-600">
+    <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="bg-white p-2 rounded-full">
+          <i data-lucide="thermometer" class="w-7 h-7 text-blue-900"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">TUVN</h1>
+          <p class="text-xs text-blue-200 font-semibold tracking-widest">MONITOREO TÉRMICO MULTIPUNTO</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 bg-blue-950/40 px-4 py-2 rounded-lg border border-blue-400/30">
+        <div class="relative flex h-3 w-3">
+          <span id="pingDot" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 hidden"></span>
+          <span id="staticDot" class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+        </div>
+        <span id="statusText" class="text-sm font-mono text-red-200">DESCONECTADO</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- INFO BAR -->
+  <div class="bg-white border-b border-slate-200 shadow-sm">
+    <div class="container mx-auto px-4 py-2 flex flex-wrap justify-between items-center text-sm text-slate-600">
+      <div class="flex items-center gap-2">
+        <i data-lucide="user-circle" class="w-4 h-4 text-red-600"></i>
+        <span class="font-medium">Desarrollador: <span class="text-blue-900 font-bold">Carlos Ruiz</span></span>
+      </div>
+      <div class="flex gap-4 font-mono text-slate-500">
+        <span id="dateDisplay">--/--/----</span>
+        <span id="timeDisplay" class="text-blue-700 font-bold">--:--:--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <main class="flex-grow container mx-auto px-4 py-8">
+    <div class="text-center mb-6">
+      <h2 class="text-3xl font-bold text-slate-800">Monitoreo de Temperatura — Sala • Cocina • Patio • Garaje</h2>
+      <p class="text-slate-500 mt-1">Gráfica en tiempo real + alertas por rango</p>
+    </div>
+
+    <!-- GRID TARJETAS -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+      <!-- SALA -->
+      <div id="card-sala" class="sensor-card bg-white rounded-xl overflow-hidden shadow border border-slate-200">
+        <div class="bg-blue-600 p-3 flex justify-between items-center">
+          <h3 class="text-white font-bold">SALA</h3>
+          <i data-lucide="thermometer" class="text-blue-200 w-5 h-5"></i>
+        </div>
+        <div class="p-6 text-center">
+          <div class="text-5xl font-bold text-slate-800" id="val-sala">--</div>
+          <div class="mt-2">
+            <span id="badge-sala" class="px-3 py-1 rounded-full badge-normal">--</span>
+          </div>
+          <div class="mt-3">
+            <canvas id="spark-sala" class="spark-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- COCINA -->
+      <div id="card-cocina" class="sensor-card bg-white rounded-xl overflow-hidden shadow border border-slate-200">
+        <div class="bg-red-600 p-3 flex justify-between items-center">
+          <h3 class="text-white font-bold">COCINA</h3>
+          <i data-lucide="thermometer" class="text-red-200 w-5 h-5"></i>
+        </div>
+        <div class="p-6 text-center">
+          <div class="text-5xl font-bold text-slate-800" id="val-cocina">--</div>
+          <div class="mt-2">
+            <span id="badge-cocina" class="px-3 py-1 rounded-full badge-normal">--</span>
+          </div>
+          <div class="mt-3">
+            <canvas id="spark-cocina" class="spark-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- PATIO -->
+      <div id="card-patio" class="sensor-card bg-white rounded-xl overflow-hidden shadow border border-slate-200">
+        <div class="bg-blue-600 p-3 flex justify-between items-center">
+          <h3 class="text-white font-bold">PATIO</h3>
+          <i data-lucide="thermometer" class="text-blue-200 w-5 h-5"></i>
+        </div>
+        <div class="p-6 text-center">
+          <div class="text-5xl font-bold text-slate-800" id="val-patio">--</div>
+          <div class="mt-2">
+            <span id="badge-patio" class="px-3 py-1 rounded-full badge-normal">--</span>
+          </div>
+          <div class="mt-3">
+            <canvas id="spark-patio" class="spark-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- GARAJE -->
+      <div id="card-garaje" class="sensor-card bg-white rounded-xl overflow-hidden shadow border border-slate-200">
+        <div class="bg-red-600 p-3 flex justify-between items-center">
+          <h3 class="text-white font-bold">GARAJE</h3>
+          <i data-lucide="thermometer" class="text-red-200 w-5 h-5"></i>
+        </div>
+        <div class="p-6 text-center">
+          <div class="text-5xl font-bold text-slate-800" id="val-garaje">--</div>
+          <div class="mt-2">
+            <span id="badge-garaje" class="px-3 py-1 rounded-full badge-normal">--</span>
+          </div>
+          <div class="mt-3">
+            <canvas id="spark-garaje" class="spark-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PROMEDIO + GRAFICA -->
+    <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="bg-white rounded-xl p-6 shadow border border-slate-200">
+        <h4 class="text-slate-600 font-semibold">Promedio Total</h4>
+        <div class="mt-4 text-4xl font-bold" id="val-promedio">-- °C</div>
+        <div class="mt-3">
+          <span id="badge-promedio" class="px-3 py-1 rounded-full badge-normal">--</span>
+        </div>
+
+        <!-- Modo Auto/Manual y botones -->
+        <div class="mt-6 flex flex-col gap-3">
+          <div class="flex items-center justify-center gap-3">
+            <label class="inline-flex items-center gap-2"><input id="modeToggle" type="checkbox" class="h-5 w-10" /><span id="modeLabel" class="font-medium">MANUAL</span></label>
+          </div>
+
+          <div class="flex justify-center gap-3">
+            <button id="btnVentOn" class="btn bg-blue-600 text-white px-4 py-2 rounded shadow">Ventilador ON</button>
+            <button id="btnVentOff" class="btn bg-slate-600 text-white px-4 py-2 rounded shadow">Ventilador OFF</button>
+          </div>
+          <div class="flex justify-center gap-3">
+            <button id="btnCalOn" class="btn bg-amber-500 text-white px-4 py-2 rounded shadow">Calefactor ON</button>
+            <button id="btnCalOff" class="btn bg-slate-600 text-white px-4 py-2 rounded shadow">Calefactor OFF</button>
+          </div>
+          <div class="text-xs text-slate-500 text-center mt-2">En automático el sistema controla los actuadores según el promedio (Umbral alto &gt;25°C -> ventilador, Umbral bajo &lt;20°C -> calefactor). Los botones permiten mandar comandos manuales (si activas Manual) o forzar temporalmente cuando estás en Auto.</div>
+        </div>
+
+      </div>
+
+      <div class="lg:col-span-2 bg-white rounded-xl p-4 shadow border border-slate-200">
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="text-slate-600 font-semibold">Gráfico en tiempo real</h4>
+          <div class="text-xs text-slate-500">Últimos 20 muestras</div>
+        </div>
+        <canvas id="mainChart" style="width:100%;height:300px;"></canvas>
+      </div>
+    </div>
+
+    <!-- BOTÓN CONECTAR -->
+    <div class="mt-8 flex justify-center">
+      <button id="connectBtn" onclick="toggleConnection()" class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-8 rounded-full shadow-xl flex items-center gap-3 transition-transform hover:scale-105 active:scale-95">
+        <i data-lucide="bluetooth" class="w-5 h-5"></i>
+        <span id="connectLabel">CONECTAR DISPOSITIVO</span>
+      </button>
+    </div>
+
+  </main>
+
+  <footer class="bg-slate-900 text-slate-400 py-6 text-center text-xs border-t-4 border-red-600">
+    <p>© 2025 Instituto Superior Tecnológico Vida Nueva</p>
+  </footer>
+
+  <!-- SCRIPTS -->
+  <script>
+    lucide.createIcons(); // inicializar iconos
+
+    // --- Reloj ---
+    function updateClock() {
+      const now = new Date();
+      const optionsDate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      document.getElementById('dateDisplay').textContent = now.toLocaleDateString('es-EC', optionsDate);
+      document.getElementById('timeDisplay').textContent = now.toLocaleTimeString('es-EC');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // --- Umbrales ---
+    const UMBRAL_BAJA = 20.0;    // < 20 °C -> baja (según tu requerimiento previo)
+    const UMBRAL_ALTA = 25.0;    // > 25 °C -> alta
+
+    // --- Web Bluetooth UUIDs (debe coincidir con tu ESP32) ---
+    const serviceUuid = '1234';
+    const characteristicUuid = 'ABCD';
+    const cmdCharacteristicUuid = 'DCBA';
+
+    let bluetoothDevice = null;
+    let bleCharacteristic = null;
+    let bleCmdCharacteristic = null;
+
+    // Elementos UI
+    const statusText = document.getElementById('statusText');
+    const pingDot = document.getElementById('pingDot');
+    const staticDot = document.getElementById('staticDot');
+    const connectBtn = document.getElementById('connectBtn');
+    const connectLabel = document.getElementById('connectLabel');
+
+    // Valores y buffers
+    const MAX_POINTS = 20; // <- límite a 20 muestras
+    const labels = []; // timestamps
+    const dataBuffers = {
+      sala: [],
+      cocina: [],
+      patio: [],
+      garaje: [],
+      prom: []
+    };
+
+    // Inicializar charts (main + sparklines)
+    const ctxMain = document.getElementById('mainChart').getContext('2d');
+    const mainChart = new Chart(ctxMain, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Sala', data: dataBuffers.sala, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.06)', tension:0.3, pointRadius:0 },
+          { label: 'Cocina', data: dataBuffers.cocina, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)', tension:0.3, pointRadius:0 },
+          { label: 'Patio', data: dataBuffers.patio, borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,0.06)', tension:0.3, pointRadius:0 },
+          { label: 'Garaje', data: dataBuffers.garaje, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.06)', tension:0.3, pointRadius:0 },
+          { label: 'Promedio', data: dataBuffers.prom, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.04)', tension:0.3, borderDash: [6,4], pointRadius:0 }
+        ]
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { display: true, ticks: { maxTicksLimit: 8 } },
+          y: { beginAtZero: false, suggestedMin: -5, suggestedMax: 50 }
+        },
+        plugins: {
+          legend: { position: 'top' }
+        }
+      }
+    });
+
+    // Crear sparklines
+    function createSpark(canvasId, dataRef, color) {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      return new Chart(ctx, {
+        type: 'line',
+        data: { labels: Array(MAX_POINTS).fill(''), datasets: [{ data: dataRef, borderColor: color, tension:0.3, pointRadius:0, fill:false }] },
+        options: { animation:false, responsive:true, maintainAspectRatio:false, scales:{ x:{display:false}, y:{display:false} }, plugins:{ legend:{display:false} } }
+      });
+    }
+
+    const sparkSala   = createSpark('spark-sala', dataBuffers.sala, '#2563eb');
+    const sparkCocina = createSpark('spark-cocina', dataBuffers.cocina, '#ef4444');
+    const sparkPatio  = createSpark('spark-patio', dataBuffers.patio, '#06b6d4');
+    const sparkGaraje = createSpark('spark-garaje', dataBuffers.garaje, '#7c3aed');
+
+    // --- Helpers UI/Alertas ---
+    function classifyTemp(t) {
+      if (t === null || isNaN(t)) return { label: '--', cls: 'badge-normal' };
+      if (t < UMBRAL_BAJA) return { label: 'BAJA', cls: 'badge-low' };
+      if (t > UMBRAL_ALTA) return { label: 'ALTA', cls: 'badge-high' };
+      return { label: 'NORMAL', cls: 'badge-normal' };
+    }
+
+    function updateCard(name, value) {
+      const idVal = document.getElementById('val-' + name);
+      const idBadge = document.getElementById('badge-' + name);
+      const card = document.getElementById('card-' + name);
+
+      if (value === null || isNaN(value)) {
+        idVal.innerText = '--';
+        idBadge.innerText = '--';
+        idBadge.className = 'px-3 py-1 rounded-full badge-normal';
+      } else {
+        idVal.innerText = value.toFixed(1);
+        const c = classifyTemp(value);
+        idBadge.innerText = c.label;
+        idBadge.className = 'px-3 py-1 rounded-full ' + c.cls;
+        // agregar sombra roja si alta
+        if (c.cls === 'badge-high') {
+          card.classList.add('ring-2','ring-red-300');
+          setTimeout(()=>card.classList.remove('ring-2','ring-red-300'), 1800);
+        }
+      }
+    }
+
+    function updatePromedioUI(prom) {
+      const el = document.getElementById('val-promedio');
+      const badge = document.getElementById('badge-promedio');
+      if (isNaN(prom)) {
+        el.innerText = '-- °C';
+        badge.innerText = '--';
+        badge.className = 'px-3 py-1 rounded-full badge-normal';
+      } else {
+        el.innerText = prom.toFixed(1) + ' °C';
+        const c = classifyTemp(prom);
+        badge.innerText = c.label;
+        badge.className = 'px-3 py-1 rounded-full ' + c.cls;
+      }
+    }
+
+    // --- Gestionar buffers y gráficos ---
+    function pushSample(sala, cocina, patio, garaje) {
+      const now = new Date().toLocaleTimeString();
+      // push label
+      labels.push(now);
+      if (labels.length > MAX_POINTS) labels.shift();
+
+      const prom = average([sala, cocina, patio, garaje]);
+
+      // push each buffer
+      pushToBuffer(dataBuffers.sala, sala);
+      pushToBuffer(dataBuffers.cocina, cocina);
+      pushToBuffer(dataBuffers.patio, patio);
+      pushToBuffer(dataBuffers.garaje, garaje);
+      pushToBuffer(dataBuffers.prom, prom);
+
+      // trim datasets to MAX_POINTS
+      Object.values(dataBuffers).forEach(buf => { while (buf.length > MAX_POINTS) buf.shift(); });
+      while (mainChart.data.labels.length > MAX_POINTS) mainChart.data.labels.shift();
+      mainChart.data.datasets.forEach(ds => { while (ds.data.length > MAX_POINTS) ds.data.shift(); });
+
+      // update chart datasets
+      mainChart.update();
+
+      // update sparklines
+      sparkSala.update();
+      sparkCocina.update();
+      sparkPatio.update();
+      sparkGaraje.update();
+
+      // update UI values
+      updateCard('sala', sala);
+      updateCard('cocina', cocina);
+      updateCard('patio', patio);
+      updateCard('garaje', garaje);
+      updatePromedioUI(prom);
+
+      // en modo automático aplicamos reglas (pero respetamos overrides recientes)
+      if (modeAuto) applyAutoRules(prom);
+    }
+
+    function pushToBuffer(buf, val) {
+      buf.push(isFinite(val) ? val : NaN);
+      if (buf.length > MAX_POINTS) buf.shift();
+    }
+
+    function average(arr) {
+      const nums = arr.filter(v => isFinite(v));
+      if (nums.length === 0) return NaN;
+      return nums.reduce((a,b)=>a+b,0) / nums.length;
+    }
+
+    // --- Web Bluetooth functions ---
+    async function toggleConnection() {
+      if (bluetoothDevice && bluetoothDevice.gatt && bluetoothDevice.gatt.connected) {
+        disconnect();
+      } else {
+        connect();
+      }
+    }
+
+    async function connect() {
+      try {
+        connectLabel.innerText = 'BUSCANDO...';
+        connectBtn.classList.add('opacity-80');
+        // solicitar dispositivo con filtro por nombre (AJUSTAR si tu dispositivo tiene otro nombre)
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'TUVN casa domotica' }],
+          optionalServices: [serviceUuid]
+        });
+
+        bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+        const server = await bluetoothDevice.gatt.connect();
+        const service = await server.getPrimaryService(serviceUuid);
+        bleCharacteristic = await service.getCharacteristic(characteristicUuid);
+        // característica de comandos
+        bleCmdCharacteristic = await service.getCharacteristic(cmdCharacteristicUuid);
+
+        // iniciar notificaciones
+        await bleCharacteristic.startNotifications();
+        bleCharacteristic.addEventListener('characteristicvaluechanged', handleData);
+
+        // UI conectado
+        statusText.innerText = 'CONECTADO';
+        statusText.classList.replace('text-red-200', 'text-emerald-400');
+        staticDot.classList.replace('bg-red-500', 'bg-emerald-500');
+        pingDot.classList.remove('hidden');
+        connectLabel.innerText = 'DESCONECTAR SISTEMA';
+      } catch (err) {
+        console.error('Conexión fallida', err);
+        connectLabel.innerText = 'CONECTAR DISPOSITIVO';
+        alert('No se pudo conectar: ' + (err.message || err));
+      } finally {
+        connectBtn.classList.remove('opacity-80');
+      }
+    }
+
+    function disconnect() {
+      if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+        bluetoothDevice.gatt.disconnect();
+      }
+    }
+
+    function onDisconnected() {
+      statusText.innerText = 'DESCONECTADO';
+      statusText.classList.replace('text-emerald-400', 'text-red-200');
+      staticDot.classList.replace('bg-emerald-500', 'bg-red-500');
+      pingDot.classList.add('hidden');
+      connectLabel.innerText = 'CONECTAR DISPOSITIVO';
+    }
+
+    // estado auto/manual y overrides
+    let modeAuto = true; // por defecto automático
+    const modeToggle = document.getElementById('modeToggle');
+    const modeLabel = document.getElementById('modeLabel');
+
+    // override timers: cuando el usuario manda un comando manual, evita que el auto lo revoque durante 30s
+    const OVERRIDE_MS = 30000;
+    let lastManual = { vent:0, cal:0 };
+
+    modeToggle.addEventListener('change', ()=>{
+      modeAuto = !modeToggle.checked; // checkbox checked = MANUAL? we used checkbox, so invert logic to keep label simple
+      modeLabel.innerText = modeAuto ? 'AUTOMÁTICO' : 'MANUAL';
+    });
+
+    // escribir comando BLE (si está conectado)
+    async function writeCmd(cmd) {
+      console.log('enviando cmd ->', cmd);
+      if (!bleCmdCharacteristic) { alert('No hay característica de comandos. Conecta primero.'); return; }
+      try {
+        const data = new TextEncoder().encode(cmd);
+        await bleCmdCharacteristic.writeValue(data);
+        const now = Date.now();
+        if (cmd.includes('VENT')) lastManual.vent = now;
+        if (cmd.includes('CAL')) lastManual.cal = now;
+      } catch (e) { console.error('Error enviando comando', e); }
+    }
+
+    // botones mando manual
+    document.getElementById('btnVentOn').addEventListener('click', ()=> writeCmd('VENT_ON'));
+    document.getElementById('btnVentOff').addEventListener('click', ()=> writeCmd('VENT_OFF'));
+    document.getElementById('btnCalOn').addEventListener('click', ()=> writeCmd('CAL_ON'));
+    document.getElementById('btnCalOff').addEventListener('click', ()=> writeCmd('CAL_OFF'));
+
+    // aplicar reglas automáticas (si modeAuto === true) respetando overrides
+    function applyAutoRules(prom) {
+      const now = Date.now();
+      // si override reciente para ventilador, no cambiar
+      const ventOverridden = (now - lastManual.vent) < OVERRIDE_MS;
+      const calOverridden = (now - lastManual.cal) < OVERRIDE_MS;
+
+      if (isNaN(prom)) return;
+      if (prom > UMBRAL_ALTA) {
+        if (!ventOverridden) writeCmd('VENT_ON');
+        if (!calOverridden) writeCmd('CAL_OFF');
+      } else if (prom < UMBRAL_BAJA) {
+        if (!calOverridden) writeCmd('CAL_ON');
+        if (!ventOverridden) writeCmd('VENT_OFF');
+      } else {
+        // entre umbrales -> apagar ambos si no override
+        if (!ventOverridden) writeCmd('VENT_OFF');
+        if (!calOverridden) writeCmd('CAL_OFF');
+      }
+    }
+
+    // Manejar datos recibidos (espera JSON)
+    function handleData(event) {
+      try {
+        const value = event.target.value;
+        const decoder = new TextDecoder('utf-8');
+        const text = decoder.decode(value).trim();
+        console.log('Recibido raw:', text);
+        // soporta mensajes con final newline o múltiples JSON? asumimos 1 JSON puro.
+        const obj = JSON.parse(text);
+
+        // leer valores y parsear float
+        const sala = (obj.s1 !== undefined) ? parseFloat(obj.s1) : NaN;
+        const cocina = (obj.s2 !== undefined) ? parseFloat(obj.s2) : NaN;
+        const patio = (obj.s3 !== undefined) ? parseFloat(obj.s3) : NaN;
+        const garaje = (obj.s4 !== undefined) ? parseFloat(obj.s4) : NaN;
+
+        // insertar en buffers (si no vienen, deja NaN)
+        pushSample(sala, cocina, patio, garaje);
+
+        // efecto visual
+        pingDot.classList.remove('hidden');
+        setTimeout(()=>pingDot.classList.add('hidden'), 400);
+
+      } catch (e) {
+        console.error('Error parseando datos BLE:', e);
+      }
+    }
+
+    // Simulación opcional para pruebas locales (descomentar si no tienes BLE)
+    // function simulateData() { ... }
+
+  </script>
+</body>
+</html>
